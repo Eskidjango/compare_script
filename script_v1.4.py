@@ -88,8 +88,8 @@ class OrderDiscrepancyComparisonScript:
 
 	def _read_reports_data_from_files(self):
 		"""
-		Read data from files and put each sku and order_id to lists
-		in format 'sku#order_id' to find the missing data then
+		Read data from files and put each sku and order_id to list
+		in format '(order_id, sku)' to find the missing data then
 		"""
 
 		with open(self.old_version, 'rb') as csvfile:
