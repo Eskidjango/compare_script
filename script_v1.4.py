@@ -1,6 +1,7 @@
 from datetime import datetime
 import csv
 from openpyxl import Workbook
+import os
 
 
 """
@@ -13,14 +14,17 @@ HOW TO USE IT:
 
 """
 
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+FILES_DIR = BASE_DIR + '/files/'
+
 # These cannot be empty
-OLD_VERSION = 'to_comp_Jacob/51.csv'
-NEW_VERSION = 'to_comp_Jacob/26.csv'
+OLD_VERSION = FILES_DIR + 'to_comp_Jacob/51.csv'
+NEW_VERSION = FILES_DIR + 'to_comp_Jacob/26.csv'
 
 # Can be empty (in this case missing data will not have a reason description in output file)
-DEBUG_REPORT_REIMBURSEMENTS = 'to_comp_Jacob/reimbursements.csv'
-DEBUG_REPORT_RETURNS_TO_FBA = 'to_comp_Jacob/returns_to_fba.csv'
-DEBUG_REPORT_DATE_RANGE = 'to_comp_Jacob/date_range.csv'
+DEBUG_REPORT_REIMBURSEMENTS = FILES_DIR + 'to_comp_Jacob/reimbursements.csv'
+DEBUG_REPORT_RETURNS_TO_FBA = FILES_DIR + 'to_comp_Jacob/returns_to_fba.csv'
+DEBUG_REPORT_DATE_RANGE = FILES_DIR + 'to_comp_Jacob/date_range.csv'
 
 # # These cannot be empty
 # OLD_VERSION = 'to_comp_photosavings/NEW VERSION.csv'
@@ -50,7 +54,7 @@ class OrderDiscrepancyComparisonScript:
 	"""
 
 	reasons = {
-		'unknown_reason': 'unknown reason',
+		'unknown': 'unknown reason',
 		'not_in_debug': 'not in debug report',
 		'refund_without_order': 'In Date Range this order has only a refund record without an order one',
 		'refunds_qty_greater_than_orders': 'Refunds quantity cannot be greater than orders so variance <= 0 here',
@@ -121,22 +125,26 @@ class OrderDiscrepancyComparisonScript:
 		status 'MISSING'. Both versions data get status 'FINE'
 
 		"""
+		old_version_filename = 'old version (filename: {})'.format(self.old_version.split('/')[-1])
+		new_version_filename = 'new version (filename: {})'.format(self.new_version.split('/')[-1])
 
 		for order_sku in self.old_data_order_skus:			
 			self.reports_data[order_sku] = {}			
-			self.reports_data[order_sku]['status'] = self.FINE			
+			self.reports_data[order_sku]['status'] = self.FINE
+			self.reports_data[order_sku]['is_in'] = old_version_filename		
 			if order_sku not in self.new_data_order_skus:				
 				self.reports_data[order_sku]['status'] = self.MISSING
-				self.reports_data[order_sku]['missing_in'] = 'new version (path: {})'.format(self.new_version) # In which version it's missing
-				self.reports_data[order_sku]['reason'] = self.reasons['unknown_reason']				
+				self.reports_data[order_sku]['missing_in'] = new_version_filename  
+				self.reports_data[order_sku]['reason'] = self.reasons['unknown']				
 					
 		for order_sku in self.new_data_order_skus:				
 			self.reports_data[order_sku] = {}			
 			self.reports_data[order_sku]['status'] = self.FINE
+			self.reports_data[order_sku]['is_in'] = new_version_filename
 			if order_sku not in self.old_data_order_skus:				
 				self.reports_data[order_sku]['status'] = self.MISSING
-				self.reports_data[order_sku]['missing_in'] = 'old version (path: {})'.format(self.old_version) # In which version it's missing
-				self.reports_data[order_sku]['reason'] = self.reasons['unknown_reason']
+				self.reports_data[order_sku]['missing_in'] = old_version_filename
+				self.reports_data[order_sku]['reason'] = self.reasons['unknown']
 
 
 	def _get_reports_data_info_from_debug(self):
@@ -206,22 +214,24 @@ class OrderDiscrepancyComparisonScript:
 		for order_sku, data in self.reports_data.iteritems():
 			if not data.get('in_debug'):
 				data['reason'] = self.reasons['not_in_debug']
+				data['reason_found'] = True
 
 
 	def _check_refund_without_order_reason(self):
 		print 'Check refund without order reason'
 		for order_sku, data in self.reports_data.iteritems():
-			if data['status'] == self.MISSING and data.get('in_debug'):
+			if not data.get('reason_found'):
 				order_qty = data.get('order_qty', 0)
 				refund_qty = data.get('refund_qty', 0)
 				if order_qty == 0 and refund_qty > 0:
 					data['reason'] = self.reasons['refund_without_order']
+					data['reason_found'] = True
 
 
 	def _check_refunds_qty_greater_than_orders_reason(self):
 		print 'Check refunds qty greater than orders reason'
 		for order_sku, data in self.reports_data.iteritems():
-			if data['status'] == self.MISSING and data.get('in_debug'):
+			if not data.get('reason_found'):
 				order_qty = data.get('order_qty', 0)
 				refund_qty = data.get('refund_qty', 0)
 				if order_qty != 0 and order_qty < refund_qty:
@@ -231,15 +241,17 @@ class OrderDiscrepancyComparisonScript:
 					variance = refund_qty - data.get('reimbursed_qty', 0) - data.get('returned_qty', 0)
 					if variance <= 0:
 						data['reason'] = self.reasons['refunds_qty_greater_than_orders']
+						data['reason_found'] = True
 
 
 	def _check_should_be_in_report_reason(self):		
 		print 'Check should be in report reason'
 		for order_sku, data in self.reports_data.iteritems():
-			if data['status'] == self.MISSING and data.get('in_debug'):
+			if not data.get('reason_found'):
 				variance = data.get('refund_qty', 0) - data.get('reimbursed_qty', 0) - data.get('returned_qty', 0)
 				if variance > 0 and data.get('order_qty'):
-					data['reason'] = self.reasons['should_be_in_report']		
+					data['reason'] = self.reasons['should_be_in_report']	
+					data['reason_found'] = True	
 
 
 	def _make_output_file(self):
@@ -253,12 +265,14 @@ class OrderDiscrepancyComparisonScript:
 		output_sheet.column_dimensions['D'].width = 8
 		output_sheet.column_dimensions['E'].width = 8
 		output_sheet.column_dimensions['F'].width = 8	
-		output_sheet.column_dimensions['G'].width = 10	
-		output_sheet.column_dimensions['H'].width = 15
-		output_sheet.column_dimensions['I'].width = 40
+		output_sheet.column_dimensions['G'].width = 10
+		output_sheet.column_dimensions['H'].width = 10	
+		output_sheet.column_dimensions['I'].width = 10	
+		output_sheet.column_dimensions['J'].width = 40
 		
 		output_sheet.append(
-			['Order_id', 'SKU', 'Order Qty', 'Refund Qty', 'Returned Qty', 'Reimbursed Qty', 'Status', 'Missing in', 'Reason']
+			['Order_id', 'SKU', 'Order Qty', 'Refund Qty', 'Returned Qty', 
+			'Reimbursed Qty', 'Is in', 'Status', 'Missing in', 'Reason']
 			)
 
 		result_data = []
@@ -271,15 +285,16 @@ class OrderDiscrepancyComparisonScript:
 				str(data.get('refund_qty', ' ')),
 				str(data.get('returned_qty', ' ')), 
 				str(data.get('reimbursed_qty', ' ')),
-				data['status'],
+				data['is_in'],
+				data['status'],				
 				data.get('missing_in'), 				
 				data.get('reason')
 			]
 			result_data.append(reports_data_row)
 
-		sorted_result_data_by_status = sorted(result_data, key=lambda i: i[6], reverse=True)
+		sorted_result_by_status_and_order_qty = sorted(result_data, key=lambda i: (i[6], i[2]), reverse=True)
 
-		for item in sorted_result_data_by_status:
+		for item in sorted_result_by_status_and_order_qty:
 			output_sheet.append(item)
 
 		output_file_name = "Order_Discrepancy_comparison_result_{date}.xlsx".format(date=datetime.now())	
@@ -313,4 +328,5 @@ if __name__ == '__main__':
 	  	date_range=DEBUG_REPORT_DATE_RANGE,
 	  )
 	Jacob_data.run_script()
+	
 
