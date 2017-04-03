@@ -143,14 +143,14 @@ class OrderDiscrepancyComparisonScript:
 		'''
 
 		Getting through all the sheets of debug report (Reimbursements, ReturnsToFBA, DateRangeCSV) and
-		taking info for all the items we have in 'self.reports_data' to find a variance and 
+		taking info for all the items we have in 'self.reports_data' and 
 		put it to the 'self.reports_data' dict 
 		Info means these characteristics:
 			1. Order quantity (from date range)
 			2. Refund quantity (from date_range)
 			3. Reimbursed quantity (from reimbursements)
 			4. Returned quantity (from returns to fba)
-
+		All of those are needed to discover the reasons of missing
 		'''
 		print 'Getting info from debug...'
 		if not self.date_range or not self.reimbursements or not self.returns_to_fba:			
