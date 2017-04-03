@@ -22,6 +22,7 @@ DEBUG_REPORT_RETURNS_TO_FBA = 'to_comp_Jacob/returns_to_fba.csv'
 DEBUG_REPORT_DATE_RANGE = 'to_comp_Jacob/date_range.csv'
 
 
+
 def compare_order_discrepancy_report_versions(old_version, 
 											  new_version, 											   
 											  reimbursements=None, 
@@ -38,12 +39,11 @@ def compare_order_discrepancy_report_versions(old_version,
 
 	:param old_version: A csv file of old version of the report.
 	:param new_version: A csv file of new version of the report. 	
-	:param debug_report_reimbursements: A csv file of 'Reimbursements' sheet of the debug report
-	:param debug_report_returns_to_fba: A csv file of 'ReturnsToFBA' sheet of the debug report
-	:param debug_report_date_range: A csv file of 'DateRangeCSV' sheet of the debug report
+	:param reimbursements: A csv file of 'Reimbursements' sheet of the debug report
+	:param returns_to_fba: A csv file of 'ReturnsToFBA' sheet of the debug report
+	:param date_range: A csv file of 'DateRangeCSV' sheet of the debug report
 	"""
 
-	
 	# Lists's items are rows that will be put into output file
 	# Items have the following format: ['Order_id', 'SKU', 'Not in', 'reason']
 	# For example: ['106-5388488-2997800', '3202NVYS_FBA', 'new version (path: to_compare/ORDER_NEW_VERS.csv)',
@@ -148,93 +148,96 @@ def compare_order_discrepancy_report_versions(old_version,
 		returns_to_fba=returns_to_fba, 
 		date_range=date_range
 		)
-	print checked_data	
+	print checked_data
+
 	# Check 'refund_without_order' and 'refunds_qty_greater_than_orders' reasons
-	# if debug_report_date_range:
-	# 	with open(debug_report_date_range, 'rb') as csvfile:
-	# 		debug_data = csv.reader(csvfile, delimiter=',')			
-	# 		# Take each item from 'missing_records' list and find all records with the same order_id and sku in 'Date Range'
-	# 		# Then count order_condition (3rd column) of the item. Its value can be 'Refund' or 'Order'
-	# 		# If count of order records is 0 and there are refund records, then put the reason 'refund_without_order'
-	# 		for item in missing_records:					
-	# 			order_id = item[0] 
-	# 			sku = item[1] 			
-	# 			refund_records_quantity = 0 # To count the number of 'Refund' ones  in 'DateRangeCSV' sheet
-	# 			order_records_quantity = 0 # To count the number of 'Order' ones in 'DateRangeCSV' sheet
-	# 			# iterate through 'DateRangeCSV' sheet of the debug report to see order_condition of the item			
-	# 			for row in debug_data:	
-	# 				order_condition = row[2] # 3rd column in 'DataRangeCSV'. Cell value can be 'Order' or 'Refund'			
-	# 				if order_id in row and sku in row and order_condition == 'Refund':
-	# 					refund_records_quantity += 1
-	# 				elif order_id in row and sku in row and order_condition == 'Order':
-	# 					order_records_quantity += 1
-	# 			if order_records_quantity == 0 and refund_records_quantity > 0:
-	# 				item.append(reasons['refund_without_order'])	
-	# 			elif order_records_quantity > refund_records_quantity:
-	# 				item.append(reasons['refunds_qty_greater_than_orders'])
-	# 			else:
-	# 				item.append(reasons['unknown_reason'])	
-	# 			csvfile.seek(0)	# Back to the begginning of the file
+	if date_range:
+		with open(date_range, 'rb') as csvfile:
+			debug_data = csv.reader(csvfile, delimiter=',')			
+			# Take each item from 'missing_records' list and find all records with the same order_id and sku in 'Date Range'
+			# Then count order_condition (3rd column) of the item. Its value can be 'Refund' or 'Order'
+			# If count of order records is 0 and there are refund records, then put the reason 'refund_without_order'
+			for item in missing_records:
+				if item not in checked_data:					
+					order_id = item[0] 
+					sku = item[1] 			
+					refund_records_quantity = 0 # To count the number of 'Refund' ones  in 'DateRangeCSV' sheet
+					order_records_quantity = 0 # To count the number of 'Order' ones in 'DateRangeCSV' sheet
+					# iterate through 'DateRangeCSV' sheet of the debug report to see order_condition of the item			
+					for row in debug_data:	
+						order_condition = row[2] # 3rd column in 'DataRangeCSV'. Cell value can be 'Order' or 'Refund'			
+						if order_id in row and sku in row and order_condition == 'Refund':
+							refund_records_quantity += 1
+						elif order_id in row and sku in row and order_condition == 'Order':
+							order_records_quantity += 1
+					if order_records_quantity == 0 and refund_records_quantity > 0:
+						item.append(reasons['refund_without_order'])	
+						checked_data.append(item)
+					elif order_records_quantity > refund_records_quantity:
+						item.append(reasons['refunds_qty_greater_than_orders'])
+						checked_data.append(item)
+					else:
+						item.append(reasons['unknown_reason'])	
+						checked_data.append(item)
+					csvfile.seek(0)	# Back to the begginning of the file
 
 
 						
 	# Write data into the output file
-	# for item in missing_records:
-	# 	output_sheet.append(item)
+	for item in checked_data:
+		output_sheet.append(item)
 
-	# for item in both_versions_records:
-	# 	output_sheet.append(item)
+	for item in both_versions_records:
+		output_sheet.append(item)
 	
 
-	# output_file_name = "Order_Discrepancy_compare_result_{date}.xlsx".format(date=datetime.now())	
+	output_file_name = "Order_Discrepancy_compare_result_{date}.xlsx".format(date=datetime.now())	
 
-	# output_file.save(output_file_name)
+	output_file.save(output_file_name)
 
-	# print 'Compare files has just been finished! Check the \'{file_name}\' to see the result'.format(file_name=output_file_name)
+	print 'Compare files has just been finished! Check the \'{file_name}\' to see the result'.format(file_name=output_file_name)
 
 
 
 def _check_if_items_are_in_debug(missed_data, reimbursements, returns_to_fba, date_range):
-	# Expect if date_range doesn't have certain order id and sku then returns_to_fba doesn't too.
-	nonlocal missing_records
+	# Expect if date_range doesn't have certain order id and sku then returns_to_fba doesn't too.	
 	checked_data = []
-	# for item in missing_records:	
-	item = missed_data[23]	
-	order_id = item[0]
-	sku = item[1]
+		
+	for item in missed_data:
+		order_id = item[0]
+		sku = item[1]
 
-	item_in_debug = False
-	with open(reimbursements, 'rb') as csvfile:
-			reimbursements_data = csv.reader(csvfile, delimiter=',')	
-			next(reimbursements_data)
+		item_in_debug = False
+		with open(reimbursements, 'rb') as csvfile:
+				reimbursements_data = csv.reader(csvfile, delimiter=',')	
+				next(reimbursements_data)
 
-			for row in reimbursements_data:
-				if order_id in row and sku in row:
-					print 'reimbursements', order_id, sku
-					item_in_debug = True
+				for row in reimbursements_data:
+					if order_id in row and sku in row:
+						# print 'reimbursements', order_id, sku
+						item_in_debug = True
 
-	with open(returns_to_fba, 'rb') as csvfile:
-			returns_to_fba_data = csv.reader(csvfile, delimiter=',')	
-			next(returns_to_fba_data)
+		with open(returns_to_fba, 'rb') as csvfile:
+				returns_to_fba_data = csv.reader(csvfile, delimiter=',')	
+				next(returns_to_fba_data)
 
-			for row in returns_to_fba_data:
-				if order_id in row and sku in row:
-					print 'returns_to_fba', order_id, sku
-					item_in_debug = True
+				for row in returns_to_fba_data:
+					if order_id in row and sku in row:
+						# print 'returns_to_fba', order_id, sku
+						item_in_debug = True
 
-	with open(date_range, 'rb') as csvfile:
-			debug_data = csv.reader(csvfile, delimiter=',')	
-			next(debug_data)
+		with open(date_range, 'rb') as csvfile:
+				debug_data = csv.reader(csvfile, delimiter=',')	
+				next(debug_data)
 
-			for row in debug_data:
-				if order_id in row and sku in row:
-					print 'date_range', order_id, sku, row[2]
-					item_in_debug = True
+				for row in debug_data:
+					if order_id in row and sku in row:
+						# print 'date_range', order_id, sku, row[2]
+						item_in_debug = True
 
-	if not item_in_debug:
-		item.append('Item not in debug')
-		missing_records.remove(item)
-		checked_data.append(item)
+		if not item_in_debug:
+			item.append('Item is not in debug')		
+			checked_data.append(item)
 
 	return checked_data
 
