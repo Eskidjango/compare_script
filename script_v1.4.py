@@ -277,9 +277,9 @@ class OrderDiscrepancyComparisonScript:
 			]
 			result_data.append(reports_data_row)
 
-		sorted_result_data_by_order_qty = sorted(result_data, key=lambda i: i[6], reverse=True)
+		sorted_result_data_by_status = sorted(result_data, key=lambda i: i[6], reverse=True)
 
-		for item in sorted_result_data_by_order_qty:
+		for item in sorted_result_data_by_status:
 			output_sheet.append(item)
 
 		output_file_name = "Order_Discrepancy_comparison_result_{date}.xlsx".format(date=datetime.now())	
